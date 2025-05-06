@@ -25,4 +25,28 @@ public class Server {
             e.printStackTrace();
         }
     }
+    private static String put(String key, String value) {
+        if (tupleSpace.containsKey(key)) {
+            return "ERR " + key + " already exists";  // 键已存在
+        }
+        tupleSpace.put(key, value);
+        return "OK (" + key + ", " + value + ") added";  // 返回成功消息
+    }
+
+    private static String get(String key) {
+        if (!tupleSpace.containsKey(key)) {
+            return "ERR " + key + " does not exist";  // 键不存在
+        }
+        String value = tupleSpace.remove(key);  // 删除并返回值
+        return "OK (" + key + ", " + value + ") removed";
+    }
+
+    private static String read(String key) {
+        if (!tupleSpace.containsKey(key)) {
+            return "ERR " + key + " does not exist";  // 键不存在
+        }
+        String value = tupleSpace.get(key);  // 读取但不删除
+        return "OK (" + key + ", " + value + ") read";
+    }
+
 }
