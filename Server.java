@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 public class Server {
     private static final int MAX_CLIENTS = 100;  // 最多支持的客户端数
     private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>();
@@ -82,6 +83,29 @@ public class Server {
             }
         } catch (IOException e) {
             System.err.println("Client disconnected unexpectedly: " + e.getMessage());
+        }
+    }
+    private static void reportStatistics() {
+        while (true) {
+            try {
+                Thread.sleep(10000);  // 每10秒输出一次统计信息
+            } catch (InterruptedException e) {
+                System.out.println("Statistics reporter interrupted.");
+                return;
+            }
+
+            System.out.println("========== Tuple Space Statistics ==========");
+            System.out.println("Tuple count       : " + tupleSpace.size());
+            System.out.println("Avg tuple size    : " + String.format("%.2f", avgTupleSize()));
+            System.out.println("Avg key size      : " + String.format("%.2f", avgKeySize()));
+            System.out.println("Avg value size    : " + String.format("%.2f", avgValueSize()));
+            System.out.println("Client count      : " + clientCount.get());
+            System.out.println("Total operations  : " + totalOps.get());
+            System.out.println("Total PUTs        : " + putCount.get());
+            System.out.println("Total GETs        : " + getCount.get());
+            System.out.println("Total READs       : " + readCount.get());
+            System.out.println("Total ERRs        : " + errorCount.get());
+            System.out.println("============================================");
         }
     }
 
