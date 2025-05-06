@@ -5,6 +5,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Server {
     private static final int MAX_CLIENTS = 100;  // 最多支持的客户端数
     private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>();
+    private static final AtomicInteger totalOps = new AtomicInteger(0);
+    private static final AtomicInteger putCount = new AtomicInteger(0);
+    private static final AtomicInteger getCount = new AtomicInteger(0);
+    private static final AtomicInteger readCount = new AtomicInteger(0);
+    private static final AtomicInteger errorCount = new AtomicInteger(0);
+    private static final AtomicInteger clientCount = new AtomicInteger(0);
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -108,5 +114,17 @@ public class Server {
             System.out.println("============================================");
         }
     }
+    private static double avgKeySize() {
+        return tupleSpace.keySet().stream().mapToInt(String::length).average().orElse(0);
+    }
 
+    private static double avgValueSize() {
+        return tupleSpace.values().stream().mapToInt(String::length).average().orElse(0);
+    }
+
+    private static double avgTupleSize() {
+        return tupleSpace.entrySet().stream()
+                .mapToInt(entry -> entry.getKey().length() + entry.getValue().length())
+                .average().orElse(0);
+    }
 }
