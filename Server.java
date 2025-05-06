@@ -48,5 +48,41 @@ public class Server {
         String value = tupleSpace.get(key);  // 读取但不删除
         return "OK (" + key + ", " + value + ") read";
     }
+    private static void handleClient(Socket clientSocket) {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
+
+            String line;
+            while ((line = in.readLine()) != null) {
+                String request = line.substring(4);  // 跳过前3个字符（长度前缀）
+                String[] parts = request.split(" ", 3);
+                String command = parts[0];
+                String key = parts.length > 1 ? parts[1] : "";
+                String value = parts.length > 2 ? parts[2] : "";
+
+                String result = "";
+                switch (command) {
+                    case "P":
+                        result = put(key, value);  // 执行 PUT 操作
+                        break;
+                    case "G":
+                        result = get(key);  // 执行 GET 操作
+                        break;
+                    case "R":
+                        result = read(key);  // 执行 READ 操作
+                        break;
+                    default:
+                        result = "ERR unknown command";  // 未知命令
+                        break;
+                }
+
+                // 将结果加上长度前缀后返回给客户端
+                String response = String.format("%03d %s", result.length() + 4, result);
+                out.println(response);
+            }
+        } catch (IOException e) {
+            System.err.println("Client disconnected unexpectedly: " + e.getMessage());
+        }
+    }
 
 }
