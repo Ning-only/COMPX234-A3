@@ -50,6 +50,7 @@ public class Client {
         socket.close();
     }
 
+
     private String buildRequestMessage(String command, String key, String value) {
         switch (command) {
             case "PUT":
