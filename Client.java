@@ -1,3 +1,6 @@
+import java.io.*;
+import java.net.Socket;
+import java.util.Scanner;
 
 public class Client {
     private final String host;
