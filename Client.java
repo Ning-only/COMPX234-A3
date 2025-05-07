@@ -45,6 +45,7 @@ public class Client {
             String key = parts.length > 1 ? parts[1] : "";
             String value = parts.length > 2 ? parts[2] : "";
 
+            // 检查长度限制
             if ((key + " " + value).length() > 970) {
                 System.out.println(line + ": ERROR - exceeds 970 characters, ignored.");
                 continue;
@@ -57,7 +58,6 @@ public class Client {
         }
         socket.close();
     }
-
 
     private String buildRequestMessage(String command, String key, String value) {
         switch (command) {
@@ -73,3 +73,5 @@ public class Client {
         }
     }
 }
+
+
