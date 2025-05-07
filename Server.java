@@ -3,15 +3,16 @@ import java.net.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+
 public class Server {
-    private static final int MAX_CLIENTS = 100;  // Maximum number of clients the server can handle at once
-    private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>();  // Shared tuple space
-    private static final AtomicInteger totalOps = new AtomicInteger(0);  // Total number of operations
-    private static final AtomicInteger putCount = new AtomicInteger(0);  // Count of PUT operations
-    private static final AtomicInteger getCount = new AtomicInteger(0);  // Count of GET operations
-    private static final AtomicInteger readCount = new AtomicInteger(0);  // Count of READ operations
-    private static final AtomicInteger errorCount = new AtomicInteger(0);  // Count of errors
-    private static final AtomicInteger clientCount = new AtomicInteger(0);  // Count of connected clients
+    private static final int MAX_CLIENTS = 100; // 最多同时处理的客户端数
+    private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>(); // 共享元组空间
+    private static final AtomicInteger totalOps = new AtomicInteger(0);
+    private static final AtomicInteger putCount = new AtomicInteger(0);
+    private static final AtomicInteger getCount = new AtomicInteger(0);
+    private static final AtomicInteger readCount = new AtomicInteger(0);
+    private static final AtomicInteger errorCount = new AtomicInteger(0);
+    private static final AtomicInteger clientCount = new AtomicInteger(0);
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -19,60 +20,40 @@ public class Server {
             return;
         }
         int port = Integer.parseInt(args[0]);
-        ExecutorService pool = Executors.newFixedThreadPool(MAX_CLIENTS); // Create a thread pool
 
-        // Start the statistics reporting thread
+        ExecutorService pool = Executors.newFixedThreadPool(MAX_CLIENTS);
+
+        // 启动统计信息线程
         new Thread(() -> reportStatistics()).start();
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server started on port " + port);
 
             while (true) {
-                Socket clientSocket = serverSocket.accept();  // Accept incoming client connections
+                Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected from " + clientSocket.getInetAddress());
                 clientCount.incrementAndGet();
-                pool.execute(() -> handleClient(clientSocket)); // Handle each client in a separate thread
+                pool.execute(() -> handleClient(clientSocket)); // 多线程处理客户端
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // PUT operation
-    private static String put(String key, String value) {
-        if (tupleSpace.containsKey(key)) {
-            return "ERR " + key + " already exists";  // Key already exists
-        }
-        tupleSpace.put(key, value);
-        return "OK (" + key + ", " + value + ") added";  // Success message for PUT operation
-    }
-
-    // GET operation
-    private static String get(String key) {
-        if (!tupleSpace.containsKey(key)) {
-            return "ERR " + key + " does not exist";  // Key does not exist
-        }
-        String value = tupleSpace.remove(key);  // Remove and return the value
-        return "OK (" + key + ", " + value + ") removed";  // Success message for GET operation
-    }
-
-    // READ operation
-    private static String read(String key) {
-        if (!tupleSpace.containsKey(key)) {
-            return "ERR " + key + " does not exist";  // Key does not exist
-        }
-        String value = tupleSpace.get(key);  // Read but do not remove
-        return "OK (" + key + ", " + value + ") read";  // Success message for READ operation
-    }
-
-    // Handle client requests
+    // 处理客户端请求
     private static void handleClient(Socket clientSocket) {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
-
+        try (
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)
+        ) {
             String line;
             while ((line = in.readLine()) != null) {
-                String request = line.substring(4);  // Skip the first 3 characters (length prefix)
+                if (line.length() < 5) {
+                    out.println("010 ERR invalid format");
+                    continue;
+                }
+
+                String request = line.substring(4);  // 跳过前 3 个长度数字 + 空格
                 String[] parts = request.split(" ", 3);
                 String command = parts[0];
                 String key = parts.length > 1 ? parts[1] : "";
@@ -81,33 +62,70 @@ public class Server {
                 String result = "";
                 switch (command) {
                     case "P":
-                        result = put(key, value);  // Execute PUT operation
+                        result = put(key, value);
                         break;
                     case "G":
-                        result = get(key);  // Execute GET operation
+                        result = get(key);
                         break;
                     case "R":
-                        result = read(key);  // Execute READ operation
+                        result = read(key);
                         break;
                     default:
-                        result = "ERR unknown command";  // Unknown command
+                        result = "ERR unknown command";
                         break;
                 }
 
-                // Send the result back to the client with a length prefix
+                // 加上长度前缀后发送回客户端
                 String response = String.format("%03d %s", result.length() + 4, result);
                 out.println(response);
             }
+
         } catch (IOException e) {
             System.err.println("Client disconnected unexpectedly: " + e.getMessage());
         }
     }
 
-    // Statistics reporting thread
+    // PUT 操作
+    private static String put(String key, String value) {
+        totalOps.incrementAndGet();
+        putCount.incrementAndGet();
+        if (tupleSpace.containsKey(key)) {
+            errorCount.incrementAndGet();
+            return "ERR " + key + " already exists";
+        }
+        tupleSpace.put(key, value);
+        return "OK (" + key + ", " + value + ") added";
+    }
+
+    // GET 操作
+    private static String get(String key) {
+        totalOps.incrementAndGet();
+        getCount.incrementAndGet();
+        if (!tupleSpace.containsKey(key)) {
+            errorCount.incrementAndGet();
+            return "ERR " + key + " does not exist";
+        }
+        String value = tupleSpace.remove(key);
+        return "OK (" + key + ", " + value + ") removed";
+    }
+
+    // READ 操作
+    private static String read(String key) {
+        totalOps.incrementAndGet();
+        readCount.incrementAndGet();
+        if (!tupleSpace.containsKey(key)) {
+            errorCount.incrementAndGet();
+            return "ERR " + key + " does not exist";
+        }
+        String value = tupleSpace.get(key);
+        return "OK (" + key + ", " + value + ") read";
+    }
+
+    // 统计信息线程
     private static void reportStatistics() {
         while (true) {
             try {
-                Thread.sleep(10000);  // Output statistics every 10 seconds
+                Thread.sleep(10000); // 每 10 秒执行一次
             } catch (InterruptedException e) {
                 System.out.println("Statistics reporter interrupted.");
                 return;
@@ -128,20 +146,18 @@ public class Server {
         }
     }
 
-    // Calculate average key size
     private static double avgKeySize() {
         return tupleSpace.keySet().stream().mapToInt(String::length).average().orElse(0);
     }
 
-    // Calculate average value size
     private static double avgValueSize() {
         return tupleSpace.values().stream().mapToInt(String::length).average().orElse(0);
     }
 
-    // Calculate average tuple size (key + value size)
     private static double avgTupleSize() {
         return tupleSpace.entrySet().stream()
                 .mapToInt(entry -> entry.getKey().length() + entry.getValue().length())
                 .average().orElse(0);
     }
 }
+
