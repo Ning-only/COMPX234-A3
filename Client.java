@@ -42,6 +42,11 @@ public class Client {
             String key = parts.length > 1 ? parts[1] : "";
             String value = parts.length > 2 ? parts[2] : "";
 
+            if ((key + " " + value).length() > 970) {
+                System.out.println(line + ": ERROR - exceeds 970 characters, ignored.");
+                continue;
+            }
+
             String requestMessage = buildRequestMessage(command, key, value);
             out.println(requestMessage);
             String response = in.readLine();
