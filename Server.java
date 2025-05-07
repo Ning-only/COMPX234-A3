@@ -3,10 +3,14 @@ import java.net.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
 public class Server {
-    private static final int MAX_CLIENTS = 100; // 最多同时处理的客户端数
-    private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>(); // 共享元组空间
+    // Maximum number of simultaneous clients supported
+    private static final int MAX_CLIENTS = 100;
+
+    // Tuple space shared among all clients (thread-safe)
+    private static final ConcurrentHashMap<String, String> tupleSpace = new ConcurrentHashMap<>();
+
+    // Operation counters
     private static final AtomicInteger totalOps = new AtomicInteger(0);
     private static final AtomicInteger putCount = new AtomicInteger(0);
     private static final AtomicInteger getCount = new AtomicInteger(0);
@@ -21,9 +25,10 @@ public class Server {
         }
         int port = Integer.parseInt(args[0]);
 
+        // Thread pool for handling multiple clients concurrently
         ExecutorService pool = Executors.newFixedThreadPool(MAX_CLIENTS);
 
-        // 启动统计信息线程
+        // Start the statistics reporting thread
         new Thread(() -> reportStatistics()).start();
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
@@ -33,14 +38,14 @@ public class Server {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected from " + clientSocket.getInetAddress());
                 clientCount.incrementAndGet();
-                pool.execute(() -> handleClient(clientSocket)); // 多线程处理客户端
+                pool.execute(() -> handleClient(clientSocket)); // Handle client in a separate thread
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // 处理客户端请求
+    // Handle client communication and requests
     private static void handleClient(Socket clientSocket) {
         try (
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -53,7 +58,8 @@ public class Server {
                     continue;
                 }
 
-                String request = line.substring(4);  // 跳过前 3 个长度数字 + 空格
+                // Extract the command portion of the request (after 3-digit length + space)
+                String request = line.substring(4);
                 String[] parts = request.split(" ", 3);
                 String command = parts[0];
                 String key = parts.length > 1 ? parts[1] : "";
@@ -75,7 +81,7 @@ public class Server {
                         break;
                 }
 
-                // 加上长度前缀后发送回客户端
+                // Prefix result with total length for response formatting
                 String response = String.format("%03d %s", result.length() + 4, result);
                 out.println(response);
             }
@@ -85,7 +91,7 @@ public class Server {
         }
     }
 
-    // PUT 操作
+    // Handle PUT command: adds a new key-value pair if the key doesn't exist
     private static String put(String key, String value) {
         totalOps.incrementAndGet();
         putCount.incrementAndGet();
@@ -97,7 +103,7 @@ public class Server {
         return "OK (" + key + ", " + value + ") added";
     }
 
-    // GET 操作
+    // Handle GET command: retrieves and removes the key-value pair
     private static String get(String key) {
         totalOps.incrementAndGet();
         getCount.incrementAndGet();
@@ -109,7 +115,7 @@ public class Server {
         return "OK (" + key + ", " + value + ") removed";
     }
 
-    // READ 操作
+    // Handle READ command: retrieves the key-value pair without removing it
     private static String read(String key) {
         totalOps.incrementAndGet();
         readCount.incrementAndGet();
@@ -121,11 +127,11 @@ public class Server {
         return "OK (" + key + ", " + value + ") read";
     }
 
-    // 统计信息线程
+    // Periodically report server statistics every 10 seconds
     private static void reportStatistics() {
         while (true) {
             try {
-                Thread.sleep(10000); // 每 10 秒执行一次
+                Thread.sleep(10000); // Sleep for 10 seconds
             } catch (InterruptedException e) {
                 System.out.println("Statistics reporter interrupted.");
                 return;
@@ -146,14 +152,17 @@ public class Server {
         }
     }
 
+    // Calculate average key size in the tuple space
     private static double avgKeySize() {
         return tupleSpace.keySet().stream().mapToInt(String::length).average().orElse(0);
     }
 
+    // Calculate average value size in the tuple space
     private static double avgValueSize() {
         return tupleSpace.values().stream().mapToInt(String::length).average().orElse(0);
     }
 
+    // Calculate average tuple size (key + value)
     private static double avgTupleSize() {
         return tupleSpace.entrySet().stream()
                 .mapToInt(entry -> entry.getKey().length() + entry.getValue().length())
